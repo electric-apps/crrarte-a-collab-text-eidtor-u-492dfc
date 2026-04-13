@@ -7,6 +7,8 @@ import { useEditor, EditorContent } from "@tiptap/react"
 import StarterKit from "@tiptap/starter-kit"
 import Collaboration from "@tiptap/extension-collaboration"
 import CollaborationCaret from "@tiptap/extension-collaboration-caret"
+import { useLiveQuery, eq } from "@tanstack/react-db"
+import { documentsCollection } from "@/db/collections/documents"
 import { absoluteApiUrl } from "@/lib/client-url"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -59,7 +61,19 @@ function CollabEditor({ docId }: { docId: string }) {
   const [synced, setSynced] = useState(false)
   const [awarenessStates, setAwarenessStates] = useState<Map<number, Record<string, unknown>>>(new Map())
   const [title, setTitle] = useState("Untitled")
+  const [titleInitialized, setTitleInitialized] = useState(false)
   const titleRef = useRef<HTMLInputElement>(null)
+
+  // Load title reactively from the documents collection
+  const { data: docs } = useLiveQuery((q) =>
+    q.from({ doc: documentsCollection }).where(({ doc }) => eq(doc.id, docId))
+  )
+  useEffect(() => {
+    if (docs[0]?.title && !titleInitialized) {
+      setTitle(docs[0].title)
+      setTitleInitialized(true)
+    }
+  }, [docs, titleInitialized])
 
   useEffect(() => {
     if (awareness.getLocalState() === null) {
@@ -108,12 +122,6 @@ function CollabEditor({ docId }: { docId: string }) {
       awareness.off("change", handleChange)
     }
   }, [awareness])
-
-  // Load title from DB
-  useEffect(() => {
-    fetch(`/api/documents/${docId}`)
-      .catch(() => {})
-  }, [docId])
 
   const handleTitleBlur = useCallback(() => {
     if (title.trim()) {
